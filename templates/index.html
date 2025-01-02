@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twitch Streamers</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Streamerboard</h1>
+
+        <!-- Canvas for Bar Chart -->
+        <canvas id="streamsChart"></canvas>
+
+        <!-- Table displaying streamer info -->
+        <table>
+            <tbody>
+                {% for streamer in streamers %}
+                    <tr>
+                        <td>{{ streamer.name }}</td>
+                        <td>{{ streamer.streams_this_year }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Including Chart.js library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        window.onload = function() {
+            // Safely inject streamers data from Flask into JavaScript
+            const streamersData = {{ streamers | tojson }};
+            console.log("Streamers data:", streamersData);  // Check the data in the console
+
+            // Sort streamers by 'streams_this_year' in descending order
+            streamersData.sort((a, b) => b.streams_this_year - a.streams_this_year);
+
+            // Extracting streamer names and their stream count for the chart
+            const streamerNames = streamersData.map(streamer => streamer.name);
+            const streamsCount = streamersData.map(streamer => streamer.streams_this_year);
+
+            // Function to generate random colors (for each streamer)
+            function generateRandomColor() {
+                const letters = '0123456789ABCDEF';
+                let color = '#';
+                for (let i = 0; i < 6; i++) {
+                    color += letters[Math.floor(Math.random() * 16)];
+                }
+                return color;
+            }
+
+            // Generate random colors for each streamer
+            const streamerColors = streamerNames.map(() => generateRandomColor());
+
+            // Create the Horizontal Bar Chart
+            const ctx = document.getElementById('streamsChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',  // Bar chart (horizontal is defined by indexAxis)
+                data: {
+                    labels: streamerNames,  // Names of the streamers
+                    datasets: [{
+                        label: 'Streams This Year',
+                        data: streamsCount,  // Streams count for each streamer
+                        backgroundColor: streamerColors,  // Use the generated colors for the bars
+                        borderColor: streamerColors,  // Border color matching the bars
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    indexAxis: 'y',  // This makes the bars horizontal (sideways)
+                    scales: {
+                        x: {
+                            beginAtZero: true,  // Start from zero on the x-axis
+                            ticks: {
+                                stepSize: 1,  // Increment by 1 (whole numbers)
+                                callback: function(value) {
+                                    return Number.isInteger(value) ? value : '';
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'  // Light grid color
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,  // Start from zero on the y-axis
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'  // Light grid color
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false,  // Disable the legend
+                        }
+                    },
+                    elements: {
+                        bar: {
+                            borderRadius: 5,  // Rounded corners for bars
+                            borderWidth: 1
+                        }
+                    },
+                    layout: {
+                        padding: {
+                            left: 10,
+                            right: 10,
+                            top: 10,
+                            bottom: 10
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
