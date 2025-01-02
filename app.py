@@ -3,15 +3,20 @@ import threading
 from flask import Flask, render_template, jsonify, request
 import sqlite3
 from datetime import datetime
-from twitch_api import is_streamer_live, get_oauth_token  # Import the correct functions
+from twitch_api import is_streamer_live, get_oauth_token
 import requests
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 
-TWITCH_CLIENT_ID = 'ecdpc7s5fb0lgue3b93lig6ayxvcia'  # Replace with your Twitch Client ID
-TWITCH_CLIENT_SECRET = '0zxck8bu8h1gjc2n28cdfwcyh4k79k'  # Replace with your Twitch Client Secret
-
-DATABASE = 'twitch_tracker.db'
+# Load Twitch API credentials and database name from environment variables
+TWITCH_CLIENT_ID = os.getenv('TWITCH_CLIENT_ID')
+TWITCH_CLIENT_SECRET = os.getenv('TWITCH_CLIENT_SECRET')
+DATABASE = os.getenv('DATABASE_NAME')
 
 # Global cache dictionary to store follower counts
 follower_cache = {}
