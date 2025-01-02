@@ -17,7 +17,7 @@ DATABASE = 'twitch_tracker.db'
 follower_cache = {}
 
 # List of streamers to monitor
-streamers_to_track = ['sydderslmao', 'sharpwells', 'led_mobile', 'zobo07', 'antioscar_', 'tcarver180', 'AuggietheCreature']
+streamers_to_track = ['sydderslmao', 'sharpwells', 'led_mobile', 'zobo07', 'antioscar_', 'damian8134']
 
 def get_user_id(username):
     oauth_token = get_oauth_token()
