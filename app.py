@@ -22,7 +22,7 @@ DATABASE = os.getenv('DATABASE_NAME')
 follower_cache = {}
 
 # List of streamers to monitor
-streamers_to_track = ['sydderslmao', 'sharpwells', 'led_mobile', 'zobo07', 'antioscar_', 'damian8134']
+streamers_to_track = ['sydderslmao', 'sharpwells', 'led_mobile', 'zobo07', 'antioscar_', 'damian8134', 's1r_charles_']
 
 def get_user_id(username):
     oauth_token = get_oauth_token()
