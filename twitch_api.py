@@ -25,16 +25,8 @@ def is_streamer_live(streamer_name):
     }
     response = requests.get(url, headers=headers)
     
-    # Check if the streamer is live (data returned is not empty)
     if response.status_code == 200:
         stream_data = response.json()
         if stream_data['data']:
             return True  # Streamer is live
     return False  # Streamer is not live
-
-# Example usage
-streamer_name = 'sydderslmao'
-if is_streamer_live(streamer_name):
-    print(f"{streamer_name} is live!")
-else:
-    print(f"{streamer_name} is not live.")

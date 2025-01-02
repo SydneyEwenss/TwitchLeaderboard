@@ -10,8 +10,11 @@
     <div class="container">
         <h1>Streamerboard</h1>
 
-        <!-- Canvas for Bar Chart -->
+        <h2>Times streamed</h2>
         <canvas id="streamsChart"></canvas>
+        
+        <h2>Total followers</h2>
+        <canvas id="followersChart"></canvas>
 
         <!-- Table displaying streamer info -->
         <table>
@@ -20,6 +23,7 @@
                     <tr>
                         <td>{{ streamer.name }}</td>
                         <td>{{ streamer.streams_this_year }}</td>
+                        <td>{{ streamer.follower_count }}</td> <!-- Display follower count -->
                     </tr>
                 {% endfor %}
             </tbody>
@@ -33,14 +37,22 @@
             // Safely inject streamers data from Flask into JavaScript
             const streamersData = {{ streamers | tojson }};
             console.log("Streamers data:", streamersData);  // Check the data in the console
-
-            // Sort streamers by 'streams_this_year' in descending order
-            streamersData.sort((a, b) => b.streams_this_year - a.streams_this_year);
-
-            // Extracting streamer names and their stream count for the chart
-            const streamerNames = streamersData.map(streamer => streamer.name);
-            const streamsCount = streamersData.map(streamer => streamer.streams_this_year);
-
+    
+            // Sort streamers by 'streams_this_year' in descending order for streams chart
+            const sortedByStreams = [...streamersData].sort((a, b) => b.streams_this_year - a.streams_this_year);
+            
+            // Sort streamers by 'follower_count' in descending order for followers chart
+            const sortedByFollowers = [...streamersData].sort((a, b) => b.follower_count - a.follower_count);
+    
+            // Extracting streamer names, stream count, and follower count for the streams chart
+            const streamerNamesForStreams = sortedByStreams.map(streamer => streamer.name);
+            const streamsCount = sortedByStreams.map(streamer => streamer.streams_this_year);
+            var streamerColors = streamerNamesForStreams.map(() => generateRandomColor());  // Same random colors for both charts
+    
+            // Extracting streamer names and follower count for the followers chart
+            const streamerNamesForFollowers = sortedByFollowers.map(streamer => streamer.name);
+            const followerCounts = sortedByFollowers.map(streamer => streamer.follower_count);
+    
             // Function to generate random colors (for each streamer)
             function generateRandomColor() {
                 const letters = '0123456789ABCDEF';
@@ -50,55 +62,113 @@
                 }
                 return color;
             }
-
-            // Generate random colors for each streamer
-            const streamerColors = streamerNames.map(() => generateRandomColor());
-
-            // Create the Horizontal Bar Chart
-            const ctx = document.getElementById('streamsChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'bar',  // Bar chart (horizontal is defined by indexAxis)
+    
+            // Create the Stream Count Bar Chart
+            const ctxStreams = document.getElementById('streamsChart').getContext('2d');
+            new Chart(ctxStreams, {
+                type: 'bar',
                 data: {
-                    labels: streamerNames,  // Names of the streamers
+                    labels: streamerNamesForStreams,
                     datasets: [{
                         label: 'Streams This Year',
-                        data: streamsCount,  // Streams count for each streamer
-                        backgroundColor: streamerColors,  // Use the generated colors for the bars
-                        borderColor: streamerColors,  // Border color matching the bars
+                        data: streamsCount,
+                        backgroundColor: streamerColors,
+                        borderColor: streamerColors,
                         borderWidth: 1
                     }]
                 },
                 options: {
                     responsive: true,
-                    indexAxis: 'y',  // This makes the bars horizontal (sideways)
+                    indexAxis: 'y',
                     scales: {
                         x: {
-                            beginAtZero: true,  // Start from zero on the x-axis
+                            beginAtZero: true,
                             ticks: {
-                                stepSize: 1,  // Increment by 1 (whole numbers)
+                                stepSize: 1,
                                 callback: function(value) {
                                     return Number.isInteger(value) ? value : '';
                                 }
                             },
                             grid: {
-                                color: 'rgba(255, 255, 255, 0.1)'  // Light grid color
+                                color: 'rgba(255, 255, 255, 0.1)'
                             }
                         },
                         y: {
-                            beginAtZero: true,  // Start from zero on the y-axis
+                            beginAtZero: true,
                             grid: {
-                                color: 'rgba(255, 255, 255, 0.1)'  // Light grid color
+                                color: 'rgba(255, 255, 255, 0.1)'
                             }
                         }
                     },
                     plugins: {
                         legend: {
-                            display: false,  // Disable the legend
+                            display: false
                         }
                     },
                     elements: {
                         bar: {
-                            borderRadius: 5,  // Rounded corners for bars
+                            borderRadius: 5,
+                            borderWidth: 1
+                        }
+                    },
+                    layout: {
+                        padding: {
+                            left: 10,
+                            right: 10,
+                            top: 10,
+                            bottom: 10
+                        }
+                    }
+                }
+            });
+
+            var streamerColors = streamerNamesForStreams.map(() => generateRandomColor());
+    
+            // Create the Follower Count Bar Chart
+            const ctxFollowers = document.getElementById('followersChart').getContext('2d');
+            new Chart(ctxFollowers, {
+                type: 'bar',
+                data: {
+                    labels: streamerNamesForFollowers,
+                    datasets: [{
+                        label: 'Follower Count',
+                        data: followerCounts,
+                        backgroundColor: streamerColors,
+                        borderColor: streamerColors,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1000,  // Adjust as needed for followers
+                                callback: function(value) {
+                                    return Number.isInteger(value) ? value : '';
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    elements: {
+                        bar: {
+                            borderRadius: 5,
                             borderWidth: 1
                         }
                     },
@@ -114,5 +184,8 @@
             });
         }
     </script>
+    
+    
+    
 </body>
 </html>

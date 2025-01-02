@@ -1,37 +1,54 @@
 import time
 import threading
-import requests
 from flask import Flask, render_template, jsonify, request
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime
+from twitch_api import is_streamer_live, get_oauth_token  # Import the correct functions
+import requests
 
 app = Flask(__name__)
 
+TWITCH_CLIENT_ID = 'ecdpc7s5fb0lgue3b93lig6ayxvcia'  # Replace with your Twitch Client ID
+TWITCH_CLIENT_SECRET = '0zxck8bu8h1gjc2n28cdfwcyh4k79k'  # Replace with your Twitch Client Secret
+
 DATABASE = 'twitch_tracker.db'
 
-# Twitch API credentials
-TWITCH_CLIENT_ID = 'ecdpc7s5fb0lgue3b93lig6ayxvcia'  # Replace with your Twitch Client ID
-TWITCH_CLIENT_SECRET = '0zxck8bu8h1gjc2n28cdfwcyh4k79k'  # Replace with your actual Client Secret
+# Global cache dictionary to store follower counts
+follower_cache = {}
 
-# Utility function to get the SQLite database connection
-def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row  # This helps retrieve data as a dictionary
-    return conn
+# List of streamers to monitor
+streamers_to_track = ['sydderslmao', 'sharpwells', 'led_mobile', 'zobo07', 'antioscar_', 'tcarver180', 'AuggietheCreature']
 
-# Function to get OAuth token using Client ID and Secret
-def get_oauth_token():
-    url = 'https://id.twitch.tv/oauth2/token'
-    params = {
-        'client_id': TWITCH_CLIENT_ID,
-        'client_secret': TWITCH_CLIENT_SECRET,
-        'grant_type': 'client_credentials'
+def get_user_id(username):
+    oauth_token = get_oauth_token()
+    url = f'https://api.twitch.tv/helix/users'
+    headers = {
+        'Client-ID': TWITCH_CLIENT_ID,
+        'Authorization': f'Bearer {oauth_token}'
     }
-    response = requests.post(url, params=params)
-    response_data = response.json()
-    return response_data['access_token']
+    params = {
+        'login': username  # The Twitch username
+    }
+    response = requests.get(url, headers=headers, params=params)
+    
+    if response.status_code == 200:
+        user_data = response.json()
+        if user_data['data']:
+            user_id = user_data['data'][0]['id']
+            return user_id
+    return None
 
-# Function to check if a streamer is live
+# Function to check if a streamer is live and add a stream (only once per day)
+def check_and_add_stream(streamer_name):
+    try:
+        if is_streamer_live(streamer_name):
+            add_stream(streamer_name)
+        else:
+            print(f"{streamer_name} is not live.")
+    except Exception as e:
+        print(f"Error checking {streamer_name}: {e}")
+
+# Function to add a stream to the database
 def add_stream(username):
     conn = get_db()
     cursor = conn.cursor()
@@ -68,31 +85,44 @@ def add_stream(username):
     conn.commit()
     conn.close()
 
-# Function to check if the streamer is live and add a stream (only once per day)
-def check_and_add_stream(streamer_name):
-    if is_streamer_live(streamer_name):
-        add_stream(streamer_name)
-    else:
-        print(f"{streamer_name} is not live.")
+# Function to get the database connection
+def get_db():
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row  # This helps retrieve data as a dictionary
+    return conn
 
-# Function to check if a streamer is live
-def is_streamer_live(streamer_name):
-    oauth_token = get_oauth_token()
-    url = f'https://api.twitch.tv/helix/streams?user_login={streamer_name}'
-    headers = {
-        'Client-ID': TWITCH_CLIENT_ID,
-        'Authorization': f'Bearer {oauth_token}'
-    }
-    response = requests.get(url, headers=headers)
+# Function to get follower count with caching
+def get_follower_count(username):
+    """Fetch follower count from Twitch API."""
+    if username in follower_cache:
+        # Return the cached value if available
+        return follower_cache[username]
+
+    try:
+        oauth_token = get_oauth_token()
+        user_id = get_user_id(username)
+        if not user_id:
+            return 0  # Return 0 if user ID is not found
+        
+        url = f'https://api.twitch.tv/helix/channels/followers?broadcaster_id={user_id}'
+        headers = {
+            'Client-ID': TWITCH_CLIENT_ID,
+            'Authorization': f'Bearer {oauth_token}'
+        }
+        
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code == 200:
+            user_data = response.json()
+            follower_count = user_data.get('total', 0)
+            
+            # Cache the result for future use
+            follower_cache[username] = follower_count
+            return follower_count
+    except Exception as e:
+        print(f"Error in get_follower_count for {username}: {e}")
     
-    if response.status_code == 200:
-        stream_data = response.json()
-        if stream_data['data']:  # If there is data, the streamer is live
-            return True
-    return False
-
-# List of streamers to monitor
-streamers_to_track = ['sydderslmao', 'sharpwells', 'led_mobile', 'zobo07', 'antioscar_', 'tcarver180', 'AuggietheCreature']
+    return 0  # Default value in case of an error
 
 # Background thread function to monitor streams
 def monitor_streams():
@@ -107,7 +137,6 @@ def start_monitoring_thread():
     monitoring_thread.daemon = True  # Ensures the thread exits when the main program ends
     monitoring_thread.start()
 
-# Route to display streamers on the webpage
 @app.route('/')
 def home():
     conn = get_db()
@@ -115,13 +144,27 @@ def home():
 
     # Retrieve all streamers and their streams count
     cursor.execute('SELECT name, streams_this_year FROM streamers')
-    streamers = [{"name": row["name"], "streams_this_year": row["streams_this_year"]} for row in cursor.fetchall()]
+    streamers_data = cursor.fetchall()
+
+    # Create a list to hold the final data
+    streamers = []
+    
+    for row in streamers_data:
+        name = row["name"]
+        streams_this_year = row["streams_this_year"]
+        
+        # Fetch follower count using the get_follower_count function
+        follower_count = get_follower_count(name)
+        
+        streamers.append({
+            "name": name,
+            "streams_this_year": streams_this_year,
+            "follower_count": follower_count
+        })
 
     conn.close()
 
-    # Render the index.html template and pass streamers data
     return render_template('index.html', streamers=streamers)
-
 
 # Route to add a streamer (API endpoint)
 @app.route('/api/streamers', methods=['POST'])
